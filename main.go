@@ -10,11 +10,10 @@ import (
 
 var wg sync.WaitGroup
 
-const MAT1_ROWS, MAT1_COLS = 3, 4
-const MAT2_ROWS, MAT2_COLS = 4, 2
+const MAT1_ROWS, MAT1_COLS = 150, 150
+const MAT2_ROWS, MAT2_COLS = 150, 150
 
 func parallenCompute(idx1 int, idx2 int, a [MAT1_ROWS][MAT1_COLS]int, b [MAT2_ROWS][MAT2_COLS]int, result *[][]int) {
-	defer wg.Done()
 	colsA := len(a[0]) //either columns of matrix a or rows of matrix b
 	for idx3 := range colsA {
 		(*result)[idx1][idx2] += a[idx1][idx3] * b[idx3][idx2]
@@ -48,10 +47,16 @@ func matrixMultiplication(a [MAT1_ROWS][MAT1_COLS]int, b [MAT2_ROWS][MAT2_COLS]i
 
     
 	for idx := range a {
-		for idx2 := range b[0] {
-			wg.Add(1)
-			go parallenCompute(idx, idx2, a, b, &result)
-		}
+		worker := func() {
+			for idx2 := range b[0] {
+			    parallenCompute(idx, idx2, a, b, &result)
+			}
+			defer wg.Done()
+		};
+
+		wg.Add(1)
+
+		go worker()
 	}
 
     wg.Wait()
