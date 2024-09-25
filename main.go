@@ -10,16 +10,14 @@ import (
 
 var wg sync.WaitGroup
 
-const MAT1_ROWS, MAT2_ROWS = 100, 100
-const MAT1_COLS, MAT2_COLS = 100, 100
+const MAT1_ROWS, MAT1_COLS = 3, 4
+const MAT2_ROWS, MAT2_COLS = 4, 2
 
-func parallenCompute(idx1 int, idx2 int, a [MAT1_ROWS][MAT1_COLS]int, b [MAT2_ROWS][MAT2_COLS]int, intChan chan int) {
+func parallenCompute(idx1 int, idx2 int, a [MAT1_ROWS][MAT1_COLS]int, b [MAT2_ROWS][MAT2_COLS]int, result *[][]int) {
 	defer wg.Done()
-	var res int
 	for idx3 := range len(a[0]) {
-		res += a[idx1][idx3] * b[idx3][idx2]
+		(*result)[idx1][idx2] += a[idx1][idx3] * b[idx3][idx2]
 	}
-    intChan <- res
 }
 
 func validate(a [MAT1_ROWS][MAT1_COLS]int, b [MAT2_ROWS][MAT2_COLS]int) (bool, error) {
@@ -47,27 +45,14 @@ func matrixMultiplication(a [MAT1_ROWS][MAT1_COLS]int, b [MAT2_ROWS][MAT2_COLS]i
 		result[idx] = make([]int, rCols)
 	} 
 
-	resChannels := make([]chan int, rRows*rCols)
-
-	for idx := range resChannels {
-		resChannels[idx] = make(chan int, rCols)
-	}  
     
-	var cidx int = 0
 	for idx := range a {
 		for idx2 := range b[0] {
 			wg.Add(1)
-			go parallenCompute(idx, idx2, a, b, resChannels[cidx])
-			cidx += 1
+			go parallenCompute(idx, idx2, a, b, &result)
 		}
 	}
-    cidx = 0
-	for tidx := range a {
-        for tidx2 := range b[0] {
-			result[tidx][tidx2] = <- resChannels[cidx]
-			cidx += 1
-		}
-	}
+
     wg.Wait()
     return result, nil
 }
@@ -90,11 +75,15 @@ func main() {
 		}
 	} 
 
+	fmt.Println("Original Matrix A : ", a)
+	fmt.Println("Original Matrix B : ", b)
+
 	res, err := matrixMultiplication(a, b)
     
 	if err != nil {
 		panic(err)
 	}
+	fmt.Println("Result Matrix ")
 	fmt.Println(res)
 
 }
