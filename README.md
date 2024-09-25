@@ -7,6 +7,7 @@ Matrix multiplication is a fundamental operation in many scientific and engineer
 
 - Generates two random matrices of size N*M.
 - Validates matrix dimensions before multiplication.
-- Uses goroutines and channels to parallelize the multiplication process.
+- Uses goroutines to parallelize the multiplication process.
+- Uses waitgroups for managing the go routines
 - Outputs the resulting matrix.
 
