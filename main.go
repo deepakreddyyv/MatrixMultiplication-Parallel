@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"runtime"
 	"sync"
 
 	"math/rand/v2"
@@ -10,10 +11,22 @@ import (
 
 var wg sync.WaitGroup
 
-const MAT1_ROWS, MAT1_COLS = 150, 150
-const MAT2_ROWS, MAT2_COLS = 150, 150
+const MAT1_ROWS, MAT1_COLS = 200, 200
+const MAT2_ROWS, MAT2_COLS = 200, 200
+var PoolSize int = runtime.GOMAXPROCS(0) 
+/* return the total number of cpu cores,
+Adjust the values based on your need e.x var PoolSize int = 20
 
-func parallenCompute(idx1 int, idx2 int, a [MAT1_ROWS][MAT1_COLS]int, b [MAT2_ROWS][MAT2_COLS]int, result *[][]int) {
+*/
+
+func worker(jobs <- chan func()) {
+	defer wg.Done()
+    for j := range jobs {
+		j()
+	}
+}
+
+func compute(idx1 int, idx2 int, a [MAT1_ROWS][MAT1_COLS]int, b [MAT2_ROWS][MAT2_COLS]int, result *[][]int) {
 	colsA := len(a[0]) //either columns of matrix a or rows of matrix b
 	for idx3 := range colsA {
 		(*result)[idx1][idx2] += a[idx1][idx3] * b[idx3][idx2]
@@ -31,7 +44,7 @@ func validate(a [MAT1_ROWS][MAT1_COLS]int, b [MAT2_ROWS][MAT2_COLS]int) (bool, e
 }
 
 
-func matrixMultiplication(a [MAT1_ROWS][MAT1_COLS]int, b [MAT2_ROWS][MAT2_COLS]int) ([][]int, error){
+func process(a [MAT1_ROWS][MAT1_COLS]int, b [MAT2_ROWS][MAT2_COLS]int) ([][]int, error){
 	validMatrix, err := validate(a, b)
 	if !validMatrix {
         return [][]int{}, err
@@ -45,21 +58,30 @@ func matrixMultiplication(a [MAT1_ROWS][MAT1_COLS]int, b [MAT2_ROWS][MAT2_COLS]i
 		result[idx] = make([]int, rCols)
 	} 
 
+	nJobs := make(chan func(), len(a))
+
+	for range PoolSize {
+		wg.Add(1)
+		go worker(nJobs)
+	}
+
     
 	for idx := range a {
 		worker := func() {
 			for idx2 := range b[0] {
-			    parallenCompute(idx, idx2, a, b, &result)
+			    compute(idx, idx2, a, b, &result)
 			}
-			defer wg.Done()
 		};
 
-		wg.Add(1)
-
-		go worker()
+		nJobs <- worker
 	}
 
-    wg.Wait()
+	close(nJobs)
+	/* close the channel, otherwise the go routines will be waiting for the data for ever and ever causing deadlock
+	*/ 
+
+    wg.Wait() // wait till all go-routines are finished
+
     return result, nil
 }
 
@@ -84,7 +106,7 @@ func main() {
 	fmt.Println("Original Matrix A : ", a)
 	fmt.Println("Original Matrix B : ", b)
 
-	res, err := matrixMultiplication(a, b)
+	res, err := process(a, b)
     
 	if err != nil {
 		panic(err)
